@@ -34,13 +34,12 @@ class Phone(Field):
 
 class Birthday(Field):
     def __init__(self, value):
+        # Перевіряємо формат дати та зберігаємо рядок
         try:
-            self.value = datetime.strptime(value, "%d.%m.%Y")
+            datetime.strptime(value, "%d.%m.%Y")
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
-
-    def __str__(self):
-        return self.value.strftime("%d.%m.%Y")
+        super().__init__(value)
 
 class Record:
     def __init__(self, name):
@@ -61,6 +60,8 @@ class Record:
     def edit_phone(self, old_phone, new_phone):
         phone_to_edit = self.find_phone(old_phone)
         if phone_to_edit:
+            if not Phone.validate(new_phone):
+                raise ValueError("New phone number must contain exactly 10 digits.")
             phone_to_edit.value = new_phone
         else:
             raise ValueError("Phone number not found in record.")
@@ -78,7 +79,8 @@ class Record:
         if not self.birthday:
             return None
         today = datetime.now()
-        next_birthday = self.birthday.value.replace(year=today.year)
+        birthday_date = datetime.strptime(self.birthday.value, "%d.%m.%Y")
+        next_birthday = birthday_date.replace(year=today.year)
         if next_birthday < today:
             next_birthday = next_birthday.replace(year=today.year + 1)
         return (next_birthday - today).days
@@ -109,14 +111,14 @@ class AddressBook(UserDict):
         upcoming = []
         for record in self.data.values():
             if record.birthday:
-                birthday = record.birthday.value.date()
-                birthday_this_year = birthday.replace(year=today.year)
+                birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y").date()
+                birthday_this_year = birthday_date.replace(year=today.year)
                 if birthday_this_year < today:
                     birthday_this_year = birthday_this_year.replace(year=today.year + 1)
 
                 if today <= birthday_this_year <= next_week:
                     congratulation_date = birthday_this_year
-                    if birthday_this_year.weekday() in (5, 6):
+                    if birthday_this_year.weekday() in (5, 6):  # Якщо день випадає на вихідні
                         offset = 7 - birthday_this_year.weekday()
                         congratulation_date += timedelta(days=offset)
 
@@ -187,6 +189,9 @@ def main():
             print(add_contact(args, book))
 
         elif command == "change":
+            if len(args) < 3:
+                print("Usage: change <name> <old_phone> <new_phone>")
+                continue
             name, old_phone, new_phone = args
             record = book.find(name)
             if not record:
